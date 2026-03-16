@@ -106,6 +106,81 @@ Both token types return identical structure. The `output` array contains alterna
 
 Token usage can vary per run (Personal sometimes produces longer/shorter responses). Both return the same reasoning schema: `type`, `encrypted_content`, `summary`.
 
+## Chat Completions API vs Responses API — Reasoning Support
+
+### Key Finding
+
+**The Chat Completions API does NOT return reasoning summaries or encrypted content.** Only the Responses API exposes the full reasoning trace. Chat Completions only provides the `reasoning_tokens` count in usage details.
+
+### What Chat Completions gives you
+
+- `reasoning_effort` parameter in the request (`low`, `medium`, `high`, `minimal`, `none` depending on model)
+- `reasoning_tokens` count in `usage.completion_tokens_details.reasoning_tokens`
+
+### What Chat Completions does NOT give you
+
+- No reasoning **summary** text
+- No `encrypted_content`
+- No reasoning text/content in the response body — reasoning is hidden
+- Reasoning is **discarded after every request** (stateless, no carry-over between turns)
+
+### Chat Completions Response Structure (reasoning model)
+
+```json
+{
+  "choices": [{
+    "message": {
+      "content": "...",
+      "role": "assistant"
+    }
+  }],
+  "usage": {
+    "completion_tokens": 2919,
+    "prompt_tokens": 29,
+    "completion_tokens_details": {
+      "reasoning_tokens": 1792
+    }
+  }
+}
+```
+
+Note: reasoning tokens are billed but their content is not exposed.
+
+### Responses API Response Structure (for comparison)
+
+```json
+{
+  "output": [
+    {
+      "type": "reasoning",
+      "encrypted_content": "gAAAAAB...",
+      "summary": [{"type": "summary_text", "text": "..."}]
+    },
+    {
+      "type": "message",
+      "content": [...]
+    }
+  ]
+}
+```
+
+### Comparison Table
+
+| Feature | Chat Completions API | Responses API |
+|---|---|---|
+| `reasoning_effort` | Yes | Yes |
+| `reasoning_tokens` count | Yes | Yes |
+| Reasoning **summary** text | **No** | Yes |
+| `encrypted_content` | **No** | Yes |
+| Reasoning persisted across turns | **No** (stateless) | Yes (with `store: true`) |
+| Recommended by OpenAI | Legacy | Preferred |
+
+### Sources
+
+- [Reasoning models | OpenAI API](https://developers.openai.com/api/docs/guides/reasoning)
+- [encrypted_content support for Chat Completions API? - OpenAI Community](https://community.openai.com/t/reasoning-encrypted-content-support-for-chat-completions-api/1287547)
+- [Azure OpenAI reasoning models - Microsoft Learn](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/reasoning)
+
 ## Background
 
 An OpenAI account exec indicated ZDR prevents receiving reasoning tokens. This experiment confirms that **reasoning tokens are returned regardless of token type** when the `reasoning` config is passed. The main difference is billing attribution (`openai` vs `developer`) and `store` value.
